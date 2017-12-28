@@ -32,6 +32,7 @@ namespace CodeElements
     ///     The CodeElements license system that provides the abilities to activate/validate computers and access the online
     ///     service (variables & methods)
     /// </summary>
+    [CodeElementsLicenseSystem("1.0.0")]
     public static class LicenseSystem
     {
         private static bool _isInitialized;
@@ -512,7 +513,7 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
         public static async Task VerifyAccess()
         {
             CheckInitialized();
-            await CheckJwt();
+            await CheckJwt().ConfigureAwait(false);
         }
 
         /// <summary>
@@ -522,7 +523,7 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
         /// <param name="licenseTypes">The license types that are required</param>
         public static async Task Require(params LicenseTypes[] licenseTypes)
         {
-            await VerifyAccess();
+            await VerifyAccess().ConfigureAwait(false);
 
             if (Array.IndexOf(licenseTypes, LicenseType) == -1)
                 throw new UnauthorizedAccessException("Your license is not permitted to execute that operation.");
@@ -535,7 +536,7 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
         /// <returns>Return true if the current license type is part of the <see cref="licenseTypes" />, return false if not.</returns>
         public static async Task<bool> Check(params LicenseTypes[] licenseTypes)
         {
-            await VerifyAccess();
+            await VerifyAccess().ConfigureAwait(false);
             return Array.IndexOf(licenseTypes, LicenseType) > -1;
         }
 #endif
@@ -746,6 +747,86 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
             }
         }
 #else
+        /* Just a short statement about these synchronous methods to whoever reads that code:
+         * Yes, it's not nice, but there are two things to consider:
+         * 1) Because the methods won't take a long time, synchronous execution is sometimes required
+         * 2) We are not using any libraries here. We are only using the HttpClient and some own methods, so
+         *    we have full control. There exists a problem with calling Task.Result that causes a deadlock
+         *    (you can read about it here: http://blog.stephencleary.com/2012/07/dont-block-on-async-code.html),
+         *    but one way to get around it is calling ConfigureAwait(false) on every call. If that is guranteed,
+         *    there shouldn't be any problem. Because we have a nice overview over all async calls (because they are)
+         *    all in this one file and because it's the easiest way, I implemented these synchronous wrappers.
+         */
+
+        /// <summary>
+        ///     Get the value of an online variable
+        /// </summary>
+        /// <typeparam name="T">The type of the variable</typeparam>
+        /// <param name="name">The name of the variable</param>
+        /// <returns>Return the current value</returns>
+        public static T GetOnlineVariable<T>(string name)
+        {
+            return GetOnlineVariableAsync<T>(name).Result;
+        }
+
+        /// <summary>
+        ///     Get the value of an online variable
+        /// </summary>
+        /// <typeparam name="T">The type of the variable</typeparam>
+        /// <param name="name">The name of the variable</param>
+        /// <param name="obfuscationKey">The key which was used to obfuscate the variable <see cref="name" /></param>
+        /// <returns>Return the current value</returns>
+        public static T GetOnlineVariable<T>(string name, int obfuscationKey)
+        {
+            return GetOnlineVariableAsync<T>(name, obfuscationKey).Result;
+        }
+
+        /// <summary>
+        ///     Get the value of an online variable
+        /// </summary>
+        /// <param name="name">The name of the variable</param>
+        /// <returns>Return the current value</returns>
+        public static object GetOnlineVariable(string name)
+        {
+            return GetOnlineVariableAsync(name).Result;
+        }
+
+        /// <summary>
+        ///     Get the value of an online variable
+        /// </summary>
+        /// <param name="name">The name of the variable</param>
+        /// <param name="obfuscationKey">The key which was used to obfuscate the variable <see cref="name" /></param>
+        /// <returns>Return the current value</returns>
+        public static object GetOnlineVariable(string name, int obfuscationKey)
+        {
+            return GetOnlineVariableAsync(name, obfuscationKey).Result;
+        }
+
+        /// <summary>
+        ///     Execute an online method and return the result
+        /// </summary>
+        /// <typeparam name="T">The type of the return value</typeparam>
+        /// <param name="name">The name of the method</param>
+        /// <param name="parameters">The parameters for the method to execute</param>
+        /// <returns>Return the result of the method</returns>
+        public static T ExecuteOnlineMethod<T>(string name, params object[] parameters)
+        {
+            return ExecuteOnlineMethodAsync<T>(name, parameters).Result;
+        }
+
+        /// <summary>
+        ///     Execute an online method and return the result
+        /// </summary>
+        /// <typeparam name="T">The type of the return value</typeparam>
+        /// <param name="name">The name of the method</param>
+        /// <param name="obfuscationKey">The key which was used to obfuscate the method <see cref="name" /></param>
+        /// <param name="parameters">The parameters for the method to execute</param>
+        /// <returns>Return the result of the method</returns>
+        public static T ExecuteOnlineMethod<T>(string name, int obfuscationKey, params object[] parameters)
+        {
+            return ExecuteOnlineMethodAsync<T>(name, obfuscationKey, parameters).Result;
+        }
+
         /// <summary>
         ///     Get the value of an online variable
         /// </summary>
@@ -831,7 +912,7 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
         }
 
         /// <summary>
-        ///     Execute an online method and get return the result
+        ///     Execute an online method and return the result
         /// </summary>
         /// <typeparam name="T">The type of the return value</typeparam>
         /// <param name="name">The name of the method</param>
@@ -846,7 +927,7 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
         }
 
         /// <summary>
-        ///     Execute an online method and get return the result
+        ///     Execute an online method and return the result
         /// </summary>
         /// <typeparam name="T">The type of the return value</typeparam>
         /// <param name="name">The name of the method</param>
@@ -1718,6 +1799,15 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
         ///     The license types of your project. This enum must be replaced by your definitions.
         /// </summary>
         public enum LicenseTypes
+        {
+        }
+    }
+
+    [AttributeUsage(AttributeTargets.Class)]
+    public class CodeElementsLicenseSystemAttribute : Attribute
+    {
+        // ReSharper disable once UnusedParameter.Local
+        public CodeElementsLicenseSystemAttribute(string semVersion)
         {
         }
     }
