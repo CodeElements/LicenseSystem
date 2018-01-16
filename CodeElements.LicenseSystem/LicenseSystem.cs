@@ -32,9 +32,10 @@ namespace CodeElements
     ///     The CodeElements license system that provides the abilities to activate/validate computers and access the online
     ///     service (variables & methods)
     /// </summary>
-    [CodeElementsLicenseSystem("1.0.0")]
+    [CodeElementsLicenseSystem(LicenseSystemVersion)]
     public static class LicenseSystem
     {
+        private const string LicenseSystemVersion = "1.0";
         private static bool _isInitialized;
         private static bool _isLicenseVerified;
         private static string _hardwareIdString;
@@ -176,16 +177,18 @@ namespace CodeElements
                               "/{0}";
             _executeMethodUri = new Uri(MethodExecutionBaseUri, $"v1/{_projectId:N}").AbsoluteUri + "/{0}";
 
-            var clientSessionInfo = new UserSessionDto
-            {
-                OperatingSystem = GetOperatingSystemType(),
-                SystemCulture = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName,
-                Version = version ?? "0.0.0"
-            };
+            var os = GetOperatingSystem();
+            var lang = CultureInfo.CurrentUICulture;
+            var userAgent = new StringBuilder()
+                .AppendFormat("CodeElementsLicenseSystem/{0} ", LicenseSystemVersion)
+                .AppendFormat("({0} {1}; {2}) ", os.OperatingSystem, os.Version.ToString(3), lang)
+                .AppendFormat("app/{0} ", version ?? "0.0.0")
+                .ToString();
+
 #if NET20
-            Client.Headers.Add("UserSession", Serialize(clientSessionInfo));
+            Client.Headers.Add(HttpRequestHeader.UserAgent, userAgent);
 #else
-            Client.DefaultRequestHeaders.Add("UserSession", Serialize(clientSessionInfo));
+            Client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
 #endif
 
             _isInitialized = true;
@@ -435,15 +438,13 @@ namespace CodeElements
                     var information = Deserialize<OfflineLicenseInformation>(responseString);
                     WriteLicenseFile(information);
 #else
-                    var information =
-Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
+                    var information = Deserialize<LicenseInformation>(responseString);
 #endif
                     ApplyLicenseInformation(information);
                     return ComputerActivationResult.Valid;
                 }
 
-                if (!DeserializeErrors(await response.Content.ReadAsStringAsync().ConfigureAwait(false),
-                    out var errors))
+                if (!DeserializeErrors(responseString, out var errors))
                     return ComputerActivationResult.ConnectionFailed;
 
                 foreach (var error in errors)
@@ -1306,16 +1307,44 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
 
         #region Operating System
 
+        private class OperatingSystemInfo
+        {
+            public OperatingSystemInfo(OperatingSystemType operatingSystem, Version version)
+            {
+                OperatingSystem = operatingSystem;
+                Version = version;
+            }
+
+            public OperatingSystemType OperatingSystem { get; }
+            public Version Version { get; }
+        }
+
+        private enum OperatingSystemType
+        {
+            Windows,
+            WindowsServer,
+            Linux,
+            OSX
+        }
+
 #if NETSTANDARD
-        private static int GetOperatingSystemType()
+        private static OperatingSystemInfo GetOperatingSystem()
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return 32; //Windows (Other)
+            {
+                var description = RuntimeInformation.OSDescription;
+                var versionPart = description.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Last();
 
-            return 106; //Linux (Other)
+                return new OperatingSystemInfo(OperatingSystemType.Windows, Version.Parse(versionPart));
+            }
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                return new OperatingSystemInfo(OperatingSystemType.OSX, null);
+
+            return new OperatingSystemInfo(OperatingSystemType.Linux, null);
         }
 #else
-        private static int GetOperatingSystemType()
+        private static OperatingSystemInfo GetOperatingSystem()
         {
             var osVersion = Environment.OSVersion;
             switch (osVersion.Platform)
@@ -1335,26 +1364,19 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
                     var fileVersion =
                         FileVersionInfo.GetVersionInfo(
                             Path.Combine(Environment.SystemDirectory, "kernel32.dll"));
-                    switch (fileVersion.ProductMajorPart)
-                    {
-                        case 6:
-                            if (fileVersion.FileMinorPart == 0)
-                                return isServer ? 20 : 1; //Windows Server 2008 | Windows Vista
-                            else if (fileVersion.FileMinorPart == 1)
-                                return isServer ? 20 : 2; //Windows Server 2008 R2 | Windows 7
-                            else //greater than 1
-                                return isServer ? 21 : 3; //Windows Server 2012 | Windows 8/8.1
-                        case 10:
-                            return isServer ? 22 : 4; //Windows Server 2016 | Windows 10
-                        default:
-                            return 32; //Windows (Other)
-                    }
+
+                    return new OperatingSystemInfo(
+                        isServer ? OperatingSystemType.WindowsServer : OperatingSystemType.Windows,
+                        new Version(fileVersion.ProductMajorPart, fileVersion.ProductMinorPart,
+                            fileVersion.ProductBuildPart, 0));
             }
 
+            //that should not happen as we are on .Net 4.6 that should not run on Linux (expect using Mono, but the .Net Standard version would
+            //be better then)
             //https://stackoverflow.com/questions/5116977/how-to-check-the-os-version-at-runtime-e-g-windows-or-linux-without-using-a-con
             //int p = (int) Environment.OSVersion.Platform;
             //if (p == 4 || p == 6 || p == 128)
-            return 106; //Linux (Other)
+            return new OperatingSystemInfo(OperatingSystemType.Linux, osVersion.Version);
         }
 
         [DllImport("kernel32")]
@@ -1404,6 +1426,7 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
             }
         }
 
+#if ALLOW_OFFLINE
         private class OfflineLicenseInformation : LicenseInformation
         {
             public string Signature { get; set; }
@@ -1453,6 +1476,7 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
             }
 #endif
         }
+#endif
 
         private class JwToken
         {
@@ -1461,18 +1485,6 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
 
             [JsonProperty("iat")]
             public DateTime IssuedAt { get; set; }
-        }
-
-        private class UserSessionDto
-        {
-            [JsonProperty("v")]
-            public string Version { get; set; }
-
-            [JsonProperty("c")]
-            public string SystemCulture { get; set; }
-
-            [JsonProperty("s")]
-            public int OperatingSystem { get; set; }
         }
 
         private class OnlineVariableValue
@@ -1796,7 +1808,7 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
         }
 
         /// <summary>
-        ///     The license types of your project. This enum must be replaced by your definitions.
+        ///     The license types of your project. TODO This enum must be replaced by your definitions.
         /// </summary>
         public enum LicenseTypes
         {
@@ -1807,7 +1819,7 @@ Deserialize<LicenseInformation>(await response.Content.ReadAsStringAsync().Confi
     public class CodeElementsLicenseSystemAttribute : Attribute
     {
         // ReSharper disable once UnusedParameter.Local
-        public CodeElementsLicenseSystemAttribute(string semVersion)
+        public CodeElementsLicenseSystemAttribute(string version)
         {
         }
     }
