@@ -58,8 +58,8 @@ namespace CodeElements
         private static string _customerName;
         private static string _customerEmail;
 
-        private static readonly Uri LicenseSystemBaseUri = new Uri("http://localhost:63195/");
-        private static readonly Uri MethodExecutionBaseUri = new Uri("http://localhost:64206/");
+        private static readonly Uri LicenseSystemBaseUri = new Uri("http://localhost:58830/");
+        private static readonly Uri MethodExecutionBaseUri = new Uri("http://localhost:58615/");
         private static Uri _verifyLicenseUri;
         private static Uri _activateLicenseUri;
         private static string _getVariableUri;
@@ -1480,11 +1480,14 @@ namespace CodeElements
 
         private class JwToken
         {
-            [JsonProperty("exp")]
-            public DateTime TokenExpirationDate { get; set; }
+            private DateTime? _tokenExpirationDate;
 
-            [JsonProperty("iat")]
-            public DateTime IssuedAt { get; set; }
+            [JsonProperty("exp")]
+            private string Exp { get; set; }
+
+            public DateTime TokenExpirationDate => _tokenExpirationDate ?? (_tokenExpirationDate =
+                                                       new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                                                           .AddSeconds(int.Parse(Exp))).Value;
         }
 
         private class OnlineVariableValue
