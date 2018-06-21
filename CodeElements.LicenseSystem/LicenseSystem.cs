@@ -755,8 +755,8 @@ namespace CodeElements
          *    we have full control. There exists a problem with calling Task.Result that causes a deadlock
          *    (you can read about it here: http://blog.stephencleary.com/2012/07/dont-block-on-async-code.html),
          *    but one way to get around it is calling ConfigureAwait(false) on every call. If that is guranteed,
-         *    there shouldn't be any problem. Because we have a nice overview over all async calls (because they are)
-         *    all in this one file and because it's the easiest way, I implemented these synchronous wrappers.
+         *    there shouldn't be any problem. Because we have a nice overview over all async calls (because they are
+         *    all in this one file) and because it's the easiest way, I implemented these synchronous wrappers.
          */
 
         /// <summary>
@@ -1715,19 +1715,29 @@ namespace CodeElements
             ConnectionFailed,
 
             /// <summary>
-            ///     The project with the given project id was not found or doesn't have a license service connected.
+            ///     The project was disabled
             /// </summary>
-            ProjectNotFound = 2000,
+            ProjectDisabled = 100,
 
             /// <summary>
-            ///     The project was disabled by the staff of CodeElements.
+            ///     The project with the given project id was not found or doesn't have a license service connected.
             /// </summary>
-            ProjectDisabled = 2001,
+            ProjectNotFound = 101,
+
+            /// <summary>
+            ///     The project with the given project id does not have a license system set up
+            /// </summary>
+            LicenseSystemNotFound = 2000,
+
+            /// <summary>
+            ///     The license system was disabled
+            /// </summary>
+            LicenseSystemDisabled = 2001,
 
             /// <summary>
             ///     The project expired, the developer (you) let the service run out.
             /// </summary>
-            ProjectExpired = 2003,
+            LicenseSystemExpired = 2003,
 
             /// <summary>
             ///     The license was not found.
@@ -1768,19 +1778,29 @@ namespace CodeElements
             ConnectionFailed,
 
             /// <summary>
-            ///     The project with the given project id was not found or doesn't have a license service connected.
+            ///     The project was disabled
             /// </summary>
-            ProjectNotFound = 2000,
+            ProjectDisabled = 100,
 
             /// <summary>
-            ///     The project was disabled by the staff of CodeElements.
+            ///     The project with the given project id was not found or doesn't have a license service connected.
             /// </summary>
-            ProjectDisabled = 2001,
+            ProjectNotFound = 101,
+
+            /// <summary>
+            ///     The project with the given project id does not have a license system set up
+            /// </summary>
+            LicenseSystemNotFound = 2000,
+
+            /// <summary>
+            ///     The license system was disabled
+            /// </summary>
+            LicenseSystemDisabled = 2001,
 
             /// <summary>
             ///     The project expired, the developer (you) let the service run out.
             /// </summary>
-            ProjectExpired = 2003,
+            LicenseSystemExpired = 2003,
 
             /// <summary>
             ///     The license was not found.
