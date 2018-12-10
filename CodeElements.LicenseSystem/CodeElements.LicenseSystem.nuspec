@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package
+    xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+    <metadata>
+        <id>CodeElements.LicenseSystem</id>
+        <version>1.0</version>
+        <authors>CodeElements</authors>
+        <owners>CodeElements</owners>
+        <license type="expression">MIT</license>
+        <projectUrl>https://github.com/CodeElements/LicenseSystem</projectUrl>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <developmentDependency>true</developmentDependency>
+        <description>The CodeElements License System for your application as a source code package. It provides the functionality to activate a computer or verify an activation, and call online variables/methods.</description>
+        <summary>The CodeElements License System for your application as a source code package.</summary>
+        <copyright>Copyright CodeElements UG (haftungsbeschränkt) 2018</copyright>
+        <tags>codeelements, licensesystem</tags>
+        <contentFiles>
+            <files include="**/*.cs.pp" />
+        </contentFiles>
+        <dependencies>
+            <group targetFramework=".NETFramework2.0">
+                <dependency id="Newtonsoft.Json" version="11.0.2" exclude="Build,Analyzers" />
+            </group>
+            <group targetFramework=".NETFramework4.5">
+                <dependency id="Newtonsoft.Json" version="11.0.2" exclude="Build,Analyzers" />
+            </group>
+            <group targetFramework=".NETStandard1.4">
+                <dependency id="NETStandard.Library" version="1.6.1" exclude="Build,Analyzers" />
+                <dependency id="Newtonsoft.Json" version="11.0.2" exclude="Build,Analyzers" />
+            </group>
+        </dependencies>
+        <frameworkAssemblies>
+            <frameworkAssembly assemblyName="System.Net.Http" targetFramework=".NETFramework4.5" />
+        </frameworkAssemblies>
+    </metadata>
+    <files>
+        <file src="LicenseSystem.cs.pp" target="contentFiles/cs/netstandard1.4" />
+        <file src="net45/LicenseSystem.cs.pp" target="contentFiles/cs/net45" />
+        <file src="net20/LicenseSystem.cs.pp" target="contentFiles/cs/net20" />
+    </files>
+</package>

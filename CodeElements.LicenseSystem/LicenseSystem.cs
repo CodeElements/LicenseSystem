@@ -3,14 +3,20 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Net.Security;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
 #if ALLOW_OFFLINE
 using System.Text.RegularExpressions;
+#endif
+
+#if !NETSTANDARD
+using System.Net;
 #endif
 
 #if NET20
@@ -44,7 +50,7 @@ namespace CodeElements
 #if NET20
         private static readonly WebClient Client = new WebClient();
 #else
-        private static readonly HttpClient Client = new HttpClient();
+        private static readonly HttpClient Client;
 #endif
 
 #if NET20
@@ -58,20 +64,37 @@ namespace CodeElements
         private static string _customerName;
         private static string _customerEmail;
 
-        private static readonly Uri LicenseSystemBaseUri = new Uri("http://localhost:58830/");
-        private static readonly Uri MethodExecutionBaseUri = new Uri("http://localhost:58615/");
+        private static readonly Uri LicenseSystemBaseUri = new Uri("https://service.codeelements.net:2313/");
+        private static readonly Uri MethodExecutionBaseUri = new Uri("https://exec.codeelements.net:2313/");
         private static Uri _verifyLicenseUri;
         private static Uri _activateLicenseUri;
         private static string _getVariableUri;
         private static string _executeMethodUri;
+        private static readonly CodeElementsCertificateValidator CertificateValidator = new CodeElementsCertificateValidator();
 
         private static Guid _projectId;
         private static string _licenseKeyFormat;
-        private static RSAParameters _publicKey;
-        
+
 #if ALLOW_OFFLINE
+        private static RSAParameters _publicKey;
         private const string LicenseFilename = "license.elements";
 #endif
+
+        static LicenseSystem()
+        {
+#if NETSTANDARD
+            var handler = new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = ServerCertificateCustomValidationCallback
+            };
+            Client = new HttpClient(handler);
+#else
+            ServicePointManager.ServerCertificateValidationCallback = ServerCertificateValidationCallback;
+#if !NET20
+            Client = new HttpClient();
+#endif //NET20
+#endif //NETSTANDARD
+        }
 
         /// <summary>
         ///     The type of the current license
@@ -382,6 +405,9 @@ namespace CodeElements
                 //on deserialize error move to end of function
                 var restError =
                     Deserialize<RestError[]>(await response.Content.ReadAsStringAsync().ConfigureAwait(false))[0];
+                if (restError == null)
+                    response.EnsureSuccessStatusCode();
+
                 switch (restError.Code)
                 {
                     case ErrorCode.LicenseSystem_Activations_InvalidHardwareId:
@@ -429,35 +455,37 @@ namespace CodeElements
 #if GET_CUSTOMER_INFORMATION
                 requestUri = AddParameter(requestUri, "includeCustomerInfo", "true");
 #endif
-                var response = await Client.PostAsync(requestUri, null).ConfigureAwait(false);
-                var responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-                if (response.IsSuccessStatusCode)
+                using (var response = await Client.PostAsync(requestUri, null).ConfigureAwait(false))
                 {
-#if ALLOW_OFFLINE
-                    var information = Deserialize<OfflineLicenseInformation>(responseString);
-                    WriteLicenseFile(information);
-#else
-                    var information = Deserialize<LicenseInformation>(responseString);
-#endif
-                    ApplyLicenseInformation(information);
-                    return ComputerActivationResult.Valid;
-                }
+                    var responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
-                if (!DeserializeErrors(responseString, out var errors))
-                    return ComputerActivationResult.ConnectionFailed;
-
-                foreach (var error in errors)
-                    switch (error.Code)
+                    if (response.IsSuccessStatusCode)
                     {
-                        case ErrorCode.LicenseSystem_Activations_InvalidHardwareId:
-                            throw new InvalidOperationException(error.Message);
-                        case ErrorCode.LicenseSystem_Activations_InvalidLicenseKeyFormat:
-                            throw new FormatException("The format of the license key is invalid.");
+#if ALLOW_OFFLINE
+                        var information = Deserialize<OfflineLicenseInformation>(responseString);
+                        WriteLicenseFile(information);
+#else
+                        var information = Deserialize<LicenseInformation>(responseString);
+#endif
+                        ApplyLicenseInformation(information);
+                        return ComputerActivationResult.Valid;
                     }
 
-                TerminateOfflineLicense();
-                return (ComputerActivationResult) errors[0].Code;
+                    if (!DeserializeErrors(responseString, out var errors))
+                        return ComputerActivationResult.ConnectionFailed;
+
+                    foreach (var error in errors)
+                        switch (error.Code)
+                        {
+                            case ErrorCode.LicenseSystem_Activations_InvalidHardwareId:
+                                throw new InvalidOperationException(error.Message);
+                            case ErrorCode.LicenseSystem_Activations_InvalidLicenseKeyFormat:
+                                throw new FormatException("The format of the license key is invalid.");
+                        }
+
+                    TerminateOfflineLicense();
+                    return (ComputerActivationResult)errors[0].Code;
+                }
             }
             catch (HttpRequestException)
             {
@@ -963,8 +991,10 @@ namespace CodeElements
             }
             catch (Exception)
             {
-                throw new HttpRequestException("Request failed. Status code: " + response.StatusCode);
+                restError = null;
             }
+            if (restError == null)
+                response.EnsureSuccessStatusCode();
 
             switch (restError.Code)
             {
@@ -995,29 +1025,35 @@ namespace CodeElements
             };
             uri = builder.Uri;
 
-            var response = await Client.GetAsync(uri).ConfigureAwait(false);
-            if (response.IsSuccessStatusCode)
-                return Deserialize<OnlineVariableValue>(
-                    await response.Content.ReadAsStringAsync().ConfigureAwait(false));
+            using (var response = await Client.GetAsync(uri).ConfigureAwait(false))
+            {
+                if (response.IsSuccessStatusCode)
+                    return Deserialize<OnlineVariableValue>(
+                        await response.Content.ReadAsStringAsync().ConfigureAwait(false));
 
-            RestError restError;
-            try
-            {
-                restError = Deserialize<RestError>(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
-            }
-            catch (Exception)
-            {
-                throw new HttpRequestException("Request failed. Status code: " + response.StatusCode);
-            }
+                RestError restError;
+                try
+                {
+                    var responseText = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    restError = Deserialize<RestError>(responseText);
+                }
+                catch (Exception)
+                {
+                    restError = null;
+                }
 
-            switch (restError.Code)
-            {
-                case ErrorCode.LicenseSystem_Methods_NotFound:
-                    throw new InvalidOperationException($"The method \"{name}\" could not be found.");
-                case ErrorCode.LicenseSystem_Methods_ExecutionFailed:
-                    throw new InvalidOperationException($"The execution of method \"{name}\" failed.");
-                default:
-                    throw new InvalidOperationException(restError.Message);
+                if (restError == null)
+                    response.EnsureSuccessStatusCode();
+
+                switch (restError.Code)
+                {
+                    case ErrorCode.LicenseSystem_Methods_NotFound:
+                        throw new InvalidOperationException($"The method \"{name}\" could not be found.");
+                    case ErrorCode.LicenseSystem_Methods_ExecutionFailed:
+                        throw new InvalidOperationException($"The execution of method \"{name}\" failed.");
+                    default:
+                        throw new InvalidOperationException(restError.Message);
+                }
             }
         }
 #endif
@@ -1044,7 +1080,7 @@ namespace CodeElements
         {
             CheckInitialized();
 
-            if (_currentToken == null || _currentToken.TokenExpirationDate > DateTime.UtcNow.AddMinutes(1))
+            if (_currentToken == null || DateTime.UtcNow.AddMinutes(1) > _currentToken.TokenExpirationDate)
                 lock (ConnectionLock)
                 {
                     if (_currentToken == null || _currentToken.TokenExpirationDate > DateTime.UtcNow.AddMinutes(1))
@@ -1060,7 +1096,7 @@ namespace CodeElements
         {
             CheckInitialized();
 
-            if (_currentToken == null || _currentToken.TokenExpirationDate > DateTime.UtcNow.AddMinutes(1))
+            if (_currentToken == null || DateTime.UtcNow.AddMinutes(1) > _currentToken.TokenExpirationDate)
             {
                 await ConnectionSemaphore.WaitAsync().ConfigureAwait(false);
                 try
@@ -1694,6 +1730,109 @@ namespace CodeElements
             ///     The result that specifys why the license check failed. Read the enum documentation for more information.
             /// </summary>
             public ComputerCheckResult Result { get; }
+        }
+
+        #endregion
+
+        #region Certificate Validation
+
+#if NETSTANDARD
+        private static bool ServerCertificateCustomValidationCallback(HttpRequestMessage arg1, X509Certificate2 arg2,
+            X509Chain arg3, SslPolicyErrors arg4)
+        {
+            return ValidateCertificate(arg2, arg4);
+        }
+#else
+        private static bool ServerCertificateValidationCallback(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslpolicyerrors)
+        {
+            return ValidateCertificate(new X509Certificate2(certificate), sslpolicyerrors);
+        }
+#endif
+
+        private static bool ValidateCertificate(X509Certificate2 certificate, SslPolicyErrors errors)
+        {
+            if (errors == SslPolicyErrors.None)
+                return true;
+
+            if ((errors & SslPolicyErrors.RemoteCertificateNotAvailable) > 0 ||
+                (errors & SslPolicyErrors.RemoteCertificateNameMismatch) > 0)
+                return false;
+
+            return CertificateValidator.Validate(certificate);
+        }
+
+        private class CodeElementsCertificateValidator
+        {
+            private readonly X509Certificate2 _authority;
+
+            public CodeElementsCertificateValidator()
+            {
+                _authority = new X509Certificate2(Convert.FromBase64String(CertificateData));
+            }
+
+            public bool Validate(X509Certificate2 certificate)
+            {
+                var chain = new X509Chain
+                {
+                    ChainPolicy =
+                    {
+                        RevocationMode = X509RevocationMode.NoCheck,
+                        RevocationFlag = X509RevocationFlag.ExcludeRoot,
+                        VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority,
+                        VerificationTime = DateTime.Now,
+                        UrlRetrievalTimeout = new TimeSpan(0, 0, 0)
+                    }
+                };
+
+                // This part is very important. You're adding your known root here.
+                // It doesn't have to be in the computer store at all. Neither certificates do.
+                chain.ChainPolicy.ExtraStore.Add(_authority);
+
+                if (!chain.Build(certificate))
+                    return false;
+
+#if NET20
+                var valid = false;
+                foreach (var chainElement in chain.ChainElements)
+                {
+                    var x509ChainElement = (X509ChainElement) chainElement;
+                    if (x509ChainElement.Certificate.Thumbprint == _authority.Thumbprint)
+                    {
+                        valid = true;
+                        break;
+                    }
+                }
+#else
+// This piece makes sure it actually matches your known root
+                var valid = chain.ChainElements
+                    .Cast<X509ChainElement>()
+                    .Any(x => x.Certificate.Thumbprint == _authority.Thumbprint);
+#endif
+
+
+                if (!valid)
+                    return false;
+
+                return true;
+            }
+
+            private const string CertificateData = @"MIIDIzCCAgugAwIBAgIJALldXI2KvykGMA0GCSqGSIb3DQEBCwUAMBAxDjAMBgNV
+BAMMBUNFLUNBMCAXDTE4MDcwNzIyNDgwM1oYDzIwNzIwNDI0MjI0ODAzWjAQMQ4w
+DAYDVQQDDAVDRS1DQTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALM1
+mx7GvwPRbuSFJeipnQfeRMYZZ3q0J80n5sBykYw2t7dbQdqirzdL0azTVlyJ+YZS
+j+YIqWagBUZfLUoyUZOTgO/H+AKqkEHgp5o9rllgux4ygxDQadz1Sn9FmXOa3v9o
+WdHgFdGL9vgpSLBzMWv0/mzmo/5pyy5zjIvrJ7OdfoOzCQgkOSFSyslpZ5qxa42T
+OEqwbwdsaGG74tc0FouS7zzFtRjbVfctCjuZr+8kSkGoqOdNWYBKFQxqhCMr3l1n
+3SS0gDLyPo4bhgEFOGsyDnUomZ+pZmwhq+i+4oFn/kzVtfj7JmtPqH3cTtLRZKMq
+MIy9j3+xM/hjwfagoM0CAwEAAaN+MHwwHQYDVR0OBBYEFPF3t5AFU7yycrigl2+5
+j6HcApJ+MEAGA1UdIwQ5MDeAFPF3t5AFU7yycrigl2+5j6HcApJ+oRSkEjAQMQ4w
+DAYDVQQDDAVDRS1DQYIJALldXI2KvykGMAwGA1UdEwQFMAMBAf8wCwYDVR0PBAQD
+AgEGMA0GCSqGSIb3DQEBCwUAA4IBAQBK13owoHk7GLdqQlqwrtZXM7oghW2UtpHX
+gxhni19kE8e1U3IRnZNmKJsMoEIEPS7EQUBbT7luLPvzzaQF4RgHtW7/xdhTf+rO
+ZArnkeveF2TcePfeR7ckM31n8gOmxjoHpymnCrgVX3XfViqpoFgQy/aD6wpAwb3Q
+uHGxpiPlZzzNJaRd4XAMCtkvS4asL0eolNJPmK5ruD8dMFFkkFaci8/H7TNtmW56
+5HeN5l8kJ6StZYSfNo2IPlzMR45wForMH0e59fbHfKTnMXxnfzLkr6f3Ea0rFUEf
+/9FZzHnx/Qkr9JdaLc4f+MxbfnLfNgW4eUtJZaHhzbWPG0+3man5";
         }
 
         #endregion

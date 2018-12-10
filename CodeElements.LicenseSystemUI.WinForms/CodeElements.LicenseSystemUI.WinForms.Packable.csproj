@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net45</TargetFramework>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Properties\**\*</DefaultItemExcludes>
+    <DefineConstants>TRACE;MANUAL_INITIALIZATION</DefineConstants>
+    <NuspecFile>CodeElements.LicenseSystemUI.WinForms.Packable.nuspec</NuspecFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\CodeElements.LicenseSystem\LicenseSystem.cs" Link="LicenseSystem.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+</Project>

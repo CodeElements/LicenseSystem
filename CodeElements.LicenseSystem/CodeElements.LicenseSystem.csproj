@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard1.4;net20;net45</TargetFrameworks>
+    <TargetFrameworks>netstandard1.4;net45</TargetFrameworks>
+    <NuspecFile>CodeElements.LicenseSystem.nuspec</NuspecFile>
   </PropertyGroup>
 
   <ItemGroup>
