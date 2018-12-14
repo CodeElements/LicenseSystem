@@ -37,5 +37,9 @@
         <file src="LicenseSystem.cs.pp" target="contentFiles/cs/netstandard1.4" />
         <file src="net45/LicenseSystem.cs.pp" target="contentFiles/cs/net45" />
         <file src="net20/LicenseSystem.cs.pp" target="contentFiles/cs/net20" />
+
+      <file src="LicenseSystem.vb.pp" target="contentFiles/vb/netstandard1.4" />
+      <file src="net45/LicenseSystem.vb.pp" target="contentFiles/vb/net45" />
+      <file src="net20/LicenseSystem.vb.pp" target="contentFiles/vb/net20" />
     </files>
 </package>

@@ -20,7 +20,6 @@ using System.Net;
 #endif
 
 #if NET20
-using System.Net;
 using System.Collections.Specialized;
 
 #else
@@ -281,6 +280,7 @@ namespace CodeElements
             {
                 var response = Client.DownloadString(_verifyLicenseUri);
                 var information = Deserialize<LicenseInformation>(response);
+                ApplyLicenseInformation(information);
 #if ALLOW_OFFLINE
                 UpdateLicenseFile(information);
 #endif
@@ -403,11 +403,10 @@ namespace CodeElements
                 }
 
                 //on deserialize error move to end of function
-                var restError =
-                    Deserialize<RestError[]>(await response.Content.ReadAsStringAsync().ConfigureAwait(false))[0];
-                if (restError == null)
+                if (!DeserializeErrors(await response.Content.ReadAsStringAsync().ConfigureAwait(false), out var errors))
                     response.EnsureSuccessStatusCode();
 
+                var restError = errors.First();
                 switch (restError.Code)
                 {
                     case ErrorCode.LicenseSystem_Activations_InvalidHardwareId:
@@ -984,18 +983,19 @@ namespace CodeElements
                 return Deserialize<OnlineVariableValue>(
                     await response.Content.ReadAsStringAsync().ConfigureAwait(false));
 
-            RestError restError;
+            RestError[] errors;
             try
             {
-                restError = Deserialize<RestError>(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
+                 DeserializeErrors(await response.Content.ReadAsStringAsync().ConfigureAwait(false), out errors);
             }
             catch (Exception)
             {
-                restError = null;
+                errors = null;
             }
-            if (restError == null)
+            if (errors == null)
                 response.EnsureSuccessStatusCode();
 
+            var restError = errors.First();
             switch (restError.Code)
             {
                 case ErrorCode.LicenseSystem_Variables_NotFound:
@@ -1031,20 +1031,21 @@ namespace CodeElements
                     return Deserialize<OnlineVariableValue>(
                         await response.Content.ReadAsStringAsync().ConfigureAwait(false));
 
-                RestError restError;
+                RestError[] errors;
                 try
                 {
                     var responseText = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    restError = Deserialize<RestError>(responseText);
+                    DeserializeErrors(responseText, out errors);
                 }
                 catch (Exception)
                 {
-                    restError = null;
+                    errors = null;
                 }
 
-                if (restError == null)
+                if (errors == null)
                     response.EnsureSuccessStatusCode();
 
+                var restError = errors.First();
                 switch (restError.Code)
                 {
                     case ErrorCode.LicenseSystem_Methods_NotFound:
@@ -1336,7 +1337,7 @@ namespace CodeElements
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetVolumeInformation(string rootPathName, StringBuilder volumeNameBuffer,
-            int volumeNameSize, out uint volumeSerialNumber, out uint maximumComponentLength, out uint fileSystemFlags,
+            uint volumeNameSize, out uint volumeSerialNumber, out uint maximumComponentLength, out uint fileSystemFlags,
             StringBuilder fileSystemNameBuffer, int nFileSystemNameSize);
 
         #endregion
@@ -1523,7 +1524,7 @@ namespace CodeElements
 
             public DateTime TokenExpirationDate => _tokenExpirationDate ?? (_tokenExpirationDate =
                                                        new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                                                           .AddSeconds(int.Parse(Exp))).Value;
+                                                           .AddSeconds(long.Parse(Exp))).Value;
         }
 
         private class OnlineVariableValue
@@ -1780,7 +1781,7 @@ namespace CodeElements
                         RevocationFlag = X509RevocationFlag.ExcludeRoot,
                         VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority,
                         VerificationTime = DateTime.Now,
-                        UrlRetrievalTimeout = new TimeSpan(0, 0, 0)
+                        UrlRetrievalTimeout = TimeSpan.Zero
                     }
                 };
 

@@ -10,8 +10,7 @@
         <projectUrl>https://github.com/CodeElements/LicenseSystem</projectUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <developmentDependency>true</developmentDependency>
-        <description>The CodeElements License System for your application as a source code package. It provides the functionality to activate a computer or verify an activation, and call online variables/methods.</description>
-        <summary>The CodeElements License System for your application as a source code package.</summary>
+        <description>A service to automatically initialize the license system and check the activation. If the computer is not activated, show a Form that allows the user to input his license key.</description>
         <copyright>Copyright CodeElements UG (haftungsbeschränkt) 2018</copyright>
         <tags>codeelements, licensesystem</tags>
         <contentFiles>
