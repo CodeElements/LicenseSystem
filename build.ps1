@@ -21,6 +21,11 @@ $files | ForEach-Object {
     Get-Content $_.FullName | Set-Content ($_.FullName + ".pp")
 }
 
+$files = Get-ChildItem -Path ./CodeElements.LicenseSystemUI.WinForms -Filter *.vb -File | Where-Object Name -NotMatch "ApplicationEvents.vb"
+$files | ForEach-Object {
+    (Get-Content $_.FullName).Replace('CodeElements.LicenseSystemUI.WinForms.VB', '$rootnamespace$') | Set-Content ($_.FullName + ".pp")
+}
+
 dotnet pack CodeElements.LicenseSystemUI.WinForms/CodeElements.LicenseSystemUI.WinForms.Packable.csproj -o $artifactsPath
 
 # CodeElements.LicenseSystem

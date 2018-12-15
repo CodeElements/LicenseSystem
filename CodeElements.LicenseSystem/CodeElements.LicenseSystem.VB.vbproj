@@ -4,6 +4,7 @@
     <TargetFrameworks>netstandard1.4;net45;net20</TargetFrameworks>
     <NuspecFile>CodeElements.LicenseSystem.nuspec</NuspecFile>
     <OptionStrict>On</OptionStrict>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**\*.pp</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

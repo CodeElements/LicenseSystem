@@ -1173,8 +1173,8 @@ Namespace CodeElements
 
         Private Class OperatingSystemInfo
             Public Sub New(operatingSystem As OperatingSystemType, version As Version)
-                operatingSystem = operatingSystem
-                version = version
+                Me.OperatingSystem = operatingSystem
+                Me.Version = version
             End Sub
 
             Public ReadOnly Property OperatingSystem As OperatingSystemType
@@ -1431,7 +1431,7 @@ Namespace CodeElements
         Private Function DeserializeErrors(value As String, <Out> ByRef errors As RestError()) As Boolean
             Try
                 errors = Deserialize(Of RestError())(value)
-                Return True
+                Return errors IsNot Nothing AndAlso errors.Any()
             Catch ex As JsonReaderException
                 errors = Nothing
                 Return False
@@ -1505,7 +1505,7 @@ Namespace CodeElements
             ''' <param name="result">The result received from the server</param>
             Public Sub New(result As ComputerCheckResult)
                 MyBase.New($"Checking the license failed because the server returned {result} instead of a confirmation.")
-                result = result
+                Me.Result = result
             End Sub
 
             ''' <summary>

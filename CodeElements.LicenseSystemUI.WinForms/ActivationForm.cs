@@ -38,6 +38,9 @@ namespace CodeElements.LicenseSystemUI.WinForms
             activationProgressBar.Style = ProgressBarStyle.Marquee;
             activationProgressBar.Visible = true;
 
+            licenseKeyTextBox.Enabled = false;
+            continueButton.Enabled = false;
+
             var result = await LicenseSystem.ActivateComputer(licenseKeyTextBox.Text);
 
             activationProgressBar.Style = ProgressBarStyle.Blocks;
@@ -89,6 +92,8 @@ namespace CodeElements.LicenseSystemUI.WinForms
 
             MessageBox.Show(this, errorMessage, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             activationProgressBar.Visible = false;
+            licenseKeyTextBox.Enabled = true;
+            continueButton.Enabled = true;
         }
     }
 }

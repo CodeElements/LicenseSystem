@@ -15,6 +15,7 @@
         <tags>codeelements, licensesystem</tags>
         <contentFiles>
             <files include="**/*.cs.pp" />
+            <files include="**/*.vb.pp" />
         </contentFiles>
         <dependencies>
             <group targetFramework=".NETFramework4.5">
@@ -24,5 +25,6 @@
     </metadata>
     <files>
       <file src="**/*.cs.pp" target="contentFiles/cs/net45" />
+      <file src="**/*.vb.pp" target="contentFiles/vb/net45" />
     </files>
 </package>

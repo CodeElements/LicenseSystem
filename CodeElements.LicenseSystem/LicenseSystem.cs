@@ -1644,7 +1644,7 @@ namespace CodeElements
             try
             {
                 errors = Deserialize<RestError[]>(value);
-                return true;
+                return errors?.Any() == true;
             }
             catch (JsonReaderException)
             {

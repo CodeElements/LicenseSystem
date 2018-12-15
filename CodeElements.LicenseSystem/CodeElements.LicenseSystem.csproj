@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks>netstandard1.4;net45</TargetFrameworks>
     <NuspecFile>CodeElements.LicenseSystem.nuspec</NuspecFile>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**\*.pp</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

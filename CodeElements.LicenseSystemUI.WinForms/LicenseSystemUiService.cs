@@ -26,13 +26,15 @@ namespace CodeElements.LicenseSystemUI.WinForms
         /// </summary>
         /// <param name="projectId">The guid of the license system project</param>
         /// <param name="licenseKeyFormat">The format of the license keys</param>
-        /// <param name="version">The current version of your application</param>
 #if ALLOW_OFFLINE
+        /// <param name="publicKey">The public key of your license system to validate offline licenses</param>
+        /// <param name="version">The current version of your application</param>
         public static async Task Run(Guid projectId, string licenseKeyFormat, RSAParameters publicKey, string version =
  null)
         {
             LicenseSystem.Initialize(projectId, licenseKeyFormat, publicKey, version);
 #else
+        /// <param name="version">The current version of your application</param>
         public static void Run(Guid projectId, string licenseKeyFormat, string version = null)
         {
             LicenseSystem.Initialize(projectId, licenseKeyFormat, version);

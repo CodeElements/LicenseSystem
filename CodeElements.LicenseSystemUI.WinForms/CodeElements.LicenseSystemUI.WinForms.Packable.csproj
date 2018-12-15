@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net45</TargetFramework>
-    <DefaultItemExcludes>$(DefaultItemExcludes);Properties\**\*</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Properties\**\*;My Project\**\*;**\*.pp;Program.cs;ApplicationEvents.vb</DefaultItemExcludes>
     <DefineConstants>TRACE;MANUAL_INITIALIZATION</DefineConstants>
     <NuspecFile>CodeElements.LicenseSystemUI.WinForms.Packable.nuspec</NuspecFile>
   </PropertyGroup>
